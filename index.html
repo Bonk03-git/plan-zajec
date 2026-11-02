@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan zajęć</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #fff; --text: #1d2330; --muted: #6b7280;
+    --border: #e2e5ea; --accent: #2f6fde; --danger: #d14343;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15181e; --card: #1e232b; --text: #e6e8eb; --muted: #9aa3ae;
+      --border: #2e3540; --accent: #5b8ff0; --danger: #e06666;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+  h1 { margin: 0 0 20px; font-size: 24px; }
+  h2 { margin: 0 0 14px; font-size: 17px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; margin-bottom: 20px; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  input, select { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+                  background: var(--bg); color: var(--text); font: inherit; }
+  .field { margin-bottom: 12px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  button { font: inherit; cursor: pointer; border-radius: 6px; padding: 8px 14px; border: 1px solid var(--border);
+           background: var(--card); color: var(--text); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; width: 100%; }
+  button.small { padding: 3px 9px; font-size: 13px; }
+  button.danger { color: var(--danger); }
+  .course { border: 1px solid var(--border); border-left: 4px solid var(--c); border-radius: 6px;
+            padding: 10px 12px; margin-bottom: 10px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; }
+  .extra-form { flex-basis: 100%; display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 8px;
+                border-top: 1px dashed var(--border); padding-top: 10px; }
+  .extra-form .wide { grid-column: 1 / -1; }
+  .extra-form .btns { grid-column: 1 / -1; display: flex; gap: 6px; }
+  .extra-form input { padding: 6px 8px; }
+  .course small { color: var(--muted); display: block; }
+  .course .actions { display: flex; gap: 6px; align-items: start; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+  .tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .day { margin-bottom: 14px; }
+  .day h3 { font-size: 14px; margin: 0 0 6px; color: var(--muted); font-weight: 600; text-transform: capitalize; }
+  .day.today h3 { color: var(--accent); }
+  .event { display: flex; gap: 12px; padding: 7px 10px; border-left: 4px solid var(--c);
+           background: var(--bg); border-radius: 4px; margin-bottom: 4px; }
+  .event .time { min-width: 100px; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .event .what { flex: 1; }
+  .event .skip { padding: 0 8px; font-size: 13px; color: var(--muted); align-self: center; }
+  .event .skip:hover { color: var(--danger); border-color: var(--danger); }
+  .event.cancelled { opacity: .55; }
+  .event.cancelled .what strong, .event.cancelled .time { text-decoration: line-through; }
+  .event.cancelled .skip:hover { color: var(--accent); border-color: var(--accent); }
+  .head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .head h2 { margin: 0; }
+  details.card summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; }
+  details.card summary::-webkit-details-marker { display: none; }
+  details.card summary::before { content: "▸"; color: var(--muted); transition: transform .15s; }
+  details.card[open] summary::before { transform: rotate(90deg); }
+  details.card summary h2 { margin: 0; }
+  #coursesCount { color: var(--muted); font-weight: normal; }
+  .head .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .empty { color: var(--muted); }
+  .preview { font-size: 13px; color: var(--muted); margin: 4px 0 12px; }
+  .hidden { display: none; }
+  .week-nav { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+  .week-nav strong { margin-left: 8px; }
+  .week-wrap { overflow-x: auto; }
+  .week { display: grid; min-width: 560px; }
+  .week .head-cell { text-align: center; font-size: 13px; color: var(--muted); padding: 4px 0 6px;
+                     border-bottom: 1px solid var(--border); text-transform: capitalize; }
+  .week .head-cell.today { color: var(--accent); font-weight: 600; }
+  .week .hours { position: relative; }
+  .week .hours span { position: absolute; right: 6px; font-size: 11px; color: var(--muted); transform: translateY(-50%); }
+  .week .col { position: relative; border-left: 1px solid var(--border);
+               background: repeating-linear-gradient(to bottom, var(--border) 0 1px, transparent 1px var(--hour)); }
+  .week .col.today { background-color: color-mix(in srgb, var(--accent) 6%, transparent); }
+  .wk-ev { position: absolute; overflow: hidden; border-radius: 4px; padding: 2px 5px; font-size: 12px; line-height: 1.3;
+           cursor: pointer; background: color-mix(in srgb, var(--c) 18%, var(--card)); border-left: 3px solid var(--c); }
+  .wk-ev small { display: block; color: var(--muted); }</style>
+</head>
+<body>
+<main>
+  <h1>Plan zajęć</h1>
+  <div class="grid">
+    <details class="card" id="formBox">
+      <summary><h2 id="formTitle">Dodaj zajęcia</h2></summary>
+      <form id="form" style="margin-top:14px">
+        <div class="field">
+          <label for="name">Nazwa przedmiotu</label>
+          <input id="name" required placeholder="np. Analiza matematyczna">
+        </div>
+        <div class="field">
+          <label for="type">Rodzaj</label>
+          <input id="type" list="types" required placeholder="np. Laboratoria">
+          <datalist id="types">
+            <option>Wykład</option><option>Ćwiczenia</option><option>Laboratoria</option>
+            <option>Projekt</option><option>Seminarium</option><option>Konwersatorium</option>
+          </datalist>
+        </div>
+        <div class="field">
+          <label for="start">Pierwsze zajęcia (data)</label>
+          <input id="start" type="date" required>
+        </div>
+        <div class="row field">
+          <div><label for="from">Od godziny</label><input id="from" type="time" required value="08:00"></div>
+          <div><label for="to">Do godziny</label><input id="to" type="time" required value="09:30"></div>
+        </div>
+        <div class="row field">
+          <div>
+            <label for="every">Co ile tygodni</label>
+            <input id="every" type="number" min="1" max="52" value="1" required>
+          </div>
+          <div>
+            <label for="count">Liczba spotkań</label>
+            <input id="count" type="number" min="1" max="200" value="15" required>
+          </div>
+        </div>
+        <div class="field">
+          <label for="room">Sala (opcjonalnie)</label>
+          <input id="room" placeholder="np. C-13 s. 2.21">
+        </div>
+        <div class="preview" id="preview"></div>
+        <button class="primary" type="submit" id="submitBtn">Dodaj</button>
+        <button type="button" id="cancelBtn" class="hidden" style="width:100%;margin-top:8px">Anuluj edycję</button>
+      </form>
+    </details>
+
+    <details class="card" id="coursesBox">
+      <summary><h2>Przedmioty <span id="coursesCount"></span></h2></summary>
+      <div class="head" style="margin-top:14px">
+        <div class="actions">
+          <button class="small" id="exportJson" title="Zapisz kopię zapasową do pliku">Eksport (kopia)</button>
+          <button class="small" id="importJson" title="Wczytaj kopię zapasową z pliku">Import</button>
+          <button class="small" id="exportIcs" title="Plik do Google Calendar / Outlooka">Eksport .ics</button>
+          <input type="file" id="importFile" accept=".json,application/json" class="hidden">
+        </div>
+      </div>
+      <div id="courses"></div>
+    </details>
+  </div>
+
+  <section class="card">
+    <div class="tabs">
+      <button data-view="week" class="active">Tydzień</button>
+      <button data-view="upcoming">Nadchodzące</button>
+      <button data-view="all">Wszystkie</button>
+    </div>
+    <div id="schedule"></div>
+  </section>
+</main>
+
+<script>
+const STORAGE_KEY = "planZajec.v1";
+const COLORS = ["#2f6fde", "#d9822b", "#2e9e5b", "#b44fcf", "#d14343", "#1a9bb0", "#8a6d3b", "#c2417f"];
+const $ = id => document.getElementById(id);
+
+let courses = load();
+let editingId = null;
+let addingFor = null;
+let view = "week";
+
+function load() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; }
+}
+function save() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(courses)); } catch {}
+}
+
+// Daty trzymamy jako "RRRR-MM-DD" i liczymy w czasie lokalnym, żeby uniknąć przesunięć stref.
+function parseDate(s) { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); }
+function toKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function occurrences(c) {
+  const first = parseDate(c.start);
+  return Array.from({ length: c.count }, (_, i) => {
+    const d = new Date(first);
+    d.setDate(d.getDate() + i * 7 * c.every);
+    return toKey(d);
+  });
+}
+// Wszystkie spotkania przedmiotu (cykliczne + dodatkowe) w kolejności, z numeracją pomijającą odwołane.
+function sessions(c) {
+  const skipped = new Set(c.skipped || []);
+  const list = occurrences(c).map(date => ({ date, from: c.from, to: c.to, room: c.room, cancelled: skipped.has(date) }));
+  for (const e of c.extra || []) {
+    list.push({ date: e.date, from: e.from, to: e.to, room: e.room || c.room, cancelled: false, extraId: e.id });
+  }
+  list.sort((a, b) => (a.date + a.from).localeCompare(b.date + b.from));
+  const total = list.filter(s => !s.cancelled).length;
+  let n = 0;
+  for (const s of list) s.label = s.cancelled ? "odwołane" : `${++n}/${total}` + (s.extraId ? " · dodatkowe" : "");
+  return list;
+}
+const fmtLong =new Intl.DateTimeFormat("pl-PL", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+const fmtShort = new Intl.DateTimeFormat("pl-PL", { day: "numeric", month: "short" });
+const fmtWeekday = new Intl.DateTimeFormat("pl-PL", { weekday: "long" });
+const fmtWeekdayShort = new Intl.DateTimeFormat("pl-PL", { weekday: "short" });
+
+function everyLabel(n) {
+  if (n === 1) return "co tydzień";
+  if (n === 2) return "co 2 tygodnie";
+  return `co ${n} ${n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? "tygodnie" : "tygodni"}`;
+}
+
+function readForm() {
+  return {
+    name: $("name").value.trim(),
+    type: $("type").value.trim(),
+    start: $("start").value,
+    from: $("from").value,
+    to: $("to").value,
+    every: Math.max(1, parseInt($("every").value, 10) || 1),
+    count: Math.max(1, parseInt($("count").value, 10) || 1),
+    room: $("room").value.trim(),
+  };
+}
+
+function updatePreview() {
+  const c = readForm();
+  if (!c.start) { $("preview").textContent = ""; return; }
+  const dates = occurrences(c);
+  $("preview").textContent =
+    `${fmtWeekday.format(parseDate(c.start))}, ${everyLabel(c.every)} — ` +
+    `od ${fmtShort.format(parseDate(dates[0]))} do ${fmtShort.format(parseDate(dates.at(-1)))}`;
+}
+
+$("form").addEventListener("input", updatePreview);
+
+$("form").addEventListener("submit", e => {
+  e.preventDefault();
+  const c = readForm();
+  if (c.to <= c.from) { alert("Godzina zakończenia musi być późniejsza niż rozpoczęcia."); return; }
+  if (editingId) {
+    const old = courses.find(x => x.id === editingId);
+    Object.assign(old, c);
+    // Po zmianie terminów zostawiamy tylko odwołania, które nadal trafiają w jakieś spotkanie.
+    const dates = new Set(occurrences(old));
+    old.skipped = (old.skipped || []).filter(d => dates.has(d));
+  } else {
+    courses.push({ ...c, id: crypto.randomUUID(), color: COLORS[courses.length % COLORS.length], skipped: [] });
+  }
+  save();
+  resetForm();
+  render();
+});
+
+$("cancelBtn").addEventListener("click", resetForm);
+
+function resetForm() {
+  editingId = null;
+  $("form").reset();
+  $("start").value = toKey(new Date());
+  $("formTitle").textContent = "Dodaj zajęcia";
+  $("submitBtn").textContent = "Dodaj";
+  $("cancelBtn").classList.add("hidden");
+  updatePreview();
+}
+
+function startEdit(id) {
+  const c = courses.find(x => x.id === id);
+  editingId = id;
+  for (const k of ["name", "type", "start", "from", "to", "every", "count", "room"]) $(k).value = c[k] ?? "";
+  $("formTitle").textContent = "Edytuj zajęcia";
+  $("submitBtn").textContent = "Zapisz zmiany";
+  $("cancelBtn").classList.remove("hidden");
+  updatePreview();
+  $("formBox").open = true;
+  $("formBox").scrollIntoView({ behavior: "smooth", block: "start" });
+  $("name").focus({ preventScroll: true });
+}
+
+function remove(id) {
+  const c = courses.find(x => x.id === id);
+  if (!confirm(`Usunąć „${c.name} (${c.type})”?`)) return;
+  courses = courses.filter(x => x.id !== id);
+  if (editingId === id) resetForm();
+  save();
+  render();
+}
+
+function el(tag, props = {}, ...children) {
+  const n = Object.assign(document.createElement(tag), props);
+  n.append(...children);
+  return n;
+}
+
+function renderCourses() {
+  const box = $("courses");
+  box.replaceChildren();
+  $("coursesCount").textContent = `(${courses.length})`;
+  if (!courses.length) { box.append(el("p", { className: "empty" }, "Brak zajęć — dodaj pierwsze w formularzu.")); return; }
+  for (const c of courses) {
+    const list = sessions(c);
+    const active = list.filter(s => !s.cancelled);
+    const skipped = (c.skipped || []).length;
+    const extra = (c.extra || []).length;
+    const notes = [skipped && `odwołane: ${skipped}`, extra && `dodatkowe: ${extra}`].filter(Boolean).join(", ");
+    const range = active.length
+      ? `${fmtShort.format(parseDate(active[0].date))} – ${fmtShort.format(parseDate(active.at(-1).date))}`
+      : "brak terminów";
+    const info = el("div", {},
+      el("strong", {}, `${c.name} `), el("span", {}, `· ${c.type}`),
+      el("small", {}, `${fmtWeekday.format(parseDate(c.start))} ${c.from}–${c.to}, ${everyLabel(c.every)}, ` +
+        `${active.length} spotkań` + (notes ? ` (${notes})` : "")),
+      el("small", {}, range + (c.room ? " · " + c.room : "")));
+    const addBtn = el("button", { className: "small", title: "Dodaj jednorazowy termin, np. odrabianie",
+      onclick: () => { addingFor = addingFor === c.id ? null : c.id; renderCourses(); } }, "+ Termin");
+    const editBtn = el("button", { className: "small", onclick: () => startEdit(c.id) }, "Edytuj");
+    const delBtn = el("button", { className: "small danger", onclick: () => remove(c.id) }, "Usuń");
+    const row = el("div", { className: "course" }, info, el("div", { className: "actions" }, addBtn, editBtn, delBtn));
+    if (addingFor === c.id) row.append(extraForm(c));
+    row.style.setProperty("--c", c.color);
+    box.append(row);
+  }
+}
+
+function extraForm(c) {
+  const date = el("input", { type: "date", required: true, value: toKey(new Date()) });
+  const from = el("input", { type: "time", required: true, value: c.from });
+  const to = el("input", { type: "time", required: true, value: c.to });
+  const room = el("input", { placeholder: c.room ? `Sala (domyślnie ${c.room})` : "Sala (opcjonalnie)" });
+  const form = el("form", { className: "extra-form" },
+    el("div", {}, el("label", {}, "Data"), date),
+    el("div", {}, el("label", {}, "Od"), from),
+    el("div", {}, el("label", {}, "Do"), to),
+    el("div", { className: "wide" }, room),
+    el("div", { className: "btns" },
+      el("button", { type: "submit", className: "small" }, "Dodaj termin"),
+      el("button", { type: "button", className: "small", onclick: () => { addingFor = null; renderCourses(); } }, "Anuluj")));
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    if (to.value <= from.value) { alert("Godzina zakończenia musi być późniejsza niż rozpoczęcia."); return; }
+    c.extra = [...(c.extra || []), { id: crypto.randomUUID(), date: date.value, from: from.value, to: to.value, room: room.value.trim() }];
+    addingFor = null;
+    save();
+    render();
+  });
+  setTimeout(() => date.focus());
+  return form;
+}
+
+function renderSchedule() {
+  const box = $("schedule");
+  box.replaceChildren();
+  if (view === "week") { renderWeek(box); return; }
+  const today = toKey(new Date());
+  const byDay = new Map();
+  for (const c of courses) {
+    for (const s of sessions(c)) {
+      if (view === "upcoming" && (s.date < today || s.cancelled)) continue;
+      if (!byDay.has(s.date)) byDay.set(s.date, []);
+      byDay.get(s.date).push({ c, s });
+    }
+  }
+  const days = [...byDay.keys()].sort();
+  if (!days.length) {
+    box.append(el("p", { className: "empty" }, view === "upcoming" ? "Brak nadchodzących zajęć." : "Brak zajęć."));
+    return;
+  }
+  for (const date of days) {
+    const items = byDay.get(date).sort((a, b) => a.s.from.localeCompare(b.s.from));
+    const day = el("div", { className: "day" + (date === today ? " today" : "") },
+      el("h3", {}, fmtLong.format(parseDate(date)) + (date === today ? " — dziś" : "")));
+    for (const { c, s } of items) {
+      const btn = s.extraId
+        ? el("button", { className: "skip", title: "Usuń ten dodatkowy termin", onclick: () => removeExtra(c.id, s.extraId) }, "✕")
+        : s.cancelled
+          ? el("button", { className: "skip", title: "Przywróć ten termin", onclick: () => toggleSkip(c.id, s.date) }, "Przywróć")
+          : el("button", { className: "skip", title: "Odwołaj tylko ten termin", onclick: () => toggleSkip(c.id, s.date) }, "✕");
+      const ev = el("div", { className: "event" + (s.cancelled ? " cancelled" : "") },
+        el("span", { className: "time" }, `${s.from}–${s.to}`),
+        el("span", { className: "what" }, el("strong", {}, c.name), ` · ${c.type}`,
+          el("small", { style: "color:var(--muted)" }, `  (${s.label})${s.room ? " · " + s.room : ""}`)),
+        btn);
+      ev.style.setProperty("--c", c.color);
+      day.append(ev);
+    }
+    box.append(day);
+  }
+}
+
+const HOUR_PX = 48;
+let weekStart = mondayOf(new Date());
+
+function mondayOf(d) {
+  const m = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  m.setDate(m.getDate() - (m.getDay() + 6) % 7);
+  return m;
+}
+function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+function toMin(t) { const [h, m] = t.split(":").map(Number); return h * 60 + m; }
+
+// Nachodzące na siebie zajęcia dzielą szerokość kolumny na "tory".
+function assignLanes(items) {
+  let group = [], lanesEnd = [], groupEnd = -1;
+  const flush = () => { for (const it of group) it.lanes = lanesEnd.length; group = []; lanesEnd = []; };
+  for (const it of items) {
+    const start = toMin(it.s.from), end = toMin(it.s.to);
+    if (start >= groupEnd) { flush(); groupEnd = -1; }
+    let lane = lanesEnd.findIndex(e => e <= start);
+    if (lane < 0) { lane = lanesEnd.length; lanesEnd.push(end); } else lanesEnd[lane] = end;
+    it.lane = lane;
+    group.push(it);
+    groupEnd = Math.max(groupEnd, end);
+  }
+  flush();
+}
+
+function renderWeek(box) {
+  const today = toKey(new Date());
+  const days = Array.from({ length: 7 }, (_, i) => toKey(addDays(weekStart, i)));
+  const byDay = new Map(days.map(d => [d, []]));
+  for (const c of courses) {
+    for (const s of sessions(c)) if (!s.cancelled && byDay.has(s.date)) byDay.get(s.date).push({ c, s });
+  }
+  // Sobota i niedziela tylko wtedy, gdy coś w nie wypada.
+  const shown = days.filter((d, i) => i < 5 || byDay.get(d).length);
+  const all = [...byDay.values()].flat();
+  const startH = Math.min(8, ...all.map(x => Math.floor(toMin(x.s.from) / 60)));
+  const endH = Math.max(18, ...all.map(x => Math.ceil(toMin(x.s.to) / 60)));
+
+  const go = d => { weekStart = d; renderSchedule(); };
+  const sunday = addDays(weekStart, 6);
+  box.append(el("div", { className: "week-nav" },
+    el("button", { className: "small", title: "Poprzedni tydzień", onclick: () => go(addDays(weekStart, -7)) }, "‹"),
+    el("button", { className: "small", onclick: () => go(mondayOf(new Date())) }, "Dziś"),
+    el("button", { className: "small", title: "Następny tydzień", onclick: () => go(addDays(weekStart, 7)) }, "›"),
+    el("strong", {}, `${fmtShort.format(weekStart)} – ${fmtShort.format(sunday)} ${sunday.getFullYear()}`)));
+
+  const grid = el("div", { className: "week" });
+  grid.style.gridTemplateColumns = `44px repeat(${shown.length}, 1fr)`;
+  grid.style.setProperty("--hour", HOUR_PX + "px");
+  const height = (endH - startH) * HOUR_PX + "px";
+
+  grid.append(el("div", { className: "head-cell" }));
+  for (const d of shown) {
+    const date = parseDate(d);
+    grid.append(el("div", { className: "head-cell" + (d === today ? " today" : "") },
+      `${fmtWeekdayShort.format(date)} ${date.getDate()}.${date.getMonth() + 1}`));
+  }
+
+  const hours = el("div", { className: "hours" });
+  hours.style.height = height;
+  for (let h = startH + 1; h < endH; h++) {
+    const label = el("span", {}, `${h}:00`);
+    label.style.top = (h - startH) * HOUR_PX + "px";
+    hours.append(label);
+  }
+  grid.append(hours);
+
+  for (const d of shown) {
+    const col = el("div", { className: "col" + (d === today ? " today" : "") });
+    col.style.height = height;
+    const items = byDay.get(d).sort((a, b) => a.s.from.localeCompare(b.s.from) || a.s.to.localeCompare(b.s.to));
+    assignLanes(items);
+    for (const it of items) {
+      const { c, s } = it;
+      const action = s.extraId ? () => removeExtra(c.id, s.extraId) : () => toggleSkip(c.id, s.date);
+      const hint = s.extraId ? "kliknij, aby usunąć dodatkowy termin" : "kliknij, aby odwołać ten termin";
+      const ev = el("div", {
+          className: "wk-ev",
+          title: `${c.name} (${c.type})\n${s.from}–${s.to}${s.room ? "\n" + s.room : ""}\n${s.label}\n\n${hint}`,
+          onclick: action },
+        el("strong", {}, c.name),
+        el("small", {}, `${s.from}–${s.to} · ${c.type}`),
+        ...(s.room ? [el("small", {}, s.room)] : []));
+      const top = (toMin(s.from) - startH * 60) / 60 * HOUR_PX;
+      const h = (toMin(s.to) - toMin(s.from)) / 60 * HOUR_PX;
+      Object.assign(ev.style, {
+        top: top + "px", height: h - 2 + "px",
+        left: `calc(${it.lane / it.lanes * 100}% + 2px)`, width: `calc(${100 / it.lanes}% - 4px)`,
+      });
+      ev.style.setProperty("--c", c.color);
+      col.append(ev);
+    }
+    grid.append(col);
+  }
+  box.append(el("div", { className: "week-wrap" }, grid));
+}
+
+document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
+  view = b.dataset.view;
+  document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("active", x === b));
+  renderSchedule();
+}));
+
+function toggleSkip(id, date) {
+  const c = courses.find(x => x.id === id);
+  const skipped = new Set(c.skipped || []);
+  if (skipped.has(date)) skipped.delete(date);
+  else if (confirm(`Odwołać ${c.name} (${c.type}) w dniu ${fmtLong.format(parseDate(date))}?`)) skipped.add(date);
+  else return;
+  c.skipped = [...skipped].sort();
+  save();
+  render();
+}
+
+function removeExtra(id, extraId) {
+  const c = courses.find(x => x.id === id);
+  const e = c.extra.find(x => x.id === extraId);
+  if (!confirm(`Usunąć dodatkowy termin ${c.name} (${c.type}) w dniu ${fmtLong.format(parseDate(e.date))}?`)) return;
+  c.extra = c.extra.filter(x => x.id !== extraId);
+  save();
+  render();
+}
+
+function download(filename, content, type) {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const a = el("a", { href: url, download: filename });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+$("exportJson").addEventListener("click", () => {
+  download(`plan-zajec-${toKey(new Date())}.json`, JSON.stringify(courses, null, 2), "application/json");
+});
+
+$("importJson").addEventListener("click", () => $("importFile").click());
+
+$("importFile").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (!Array.isArray(data) || !data.every(c => c && c.name && c.start && c.count)) throw new Error();
+    if (courses.length && !confirm(`Zastąpić obecny plan (${courses.length} przedmiotów) danymi z pliku?`)) return;
+    courses = data.map((c, i) => ({ skipped: [], extra: [], color: COLORS[i % COLORS.length], id: crypto.randomUUID(), ...c }));
+    save();
+    resetForm();
+    render();
+  } catch {
+    alert("Nie udało się wczytać pliku — to nie jest poprawna kopia planu zajęć.");
+  }
+});
+
+$("exportIcs").addEventListener("click", () => {
+  if (!courses.length) { alert("Brak zajęć do eksportu."); return; }
+  const esc = s => String(s).replace(/[\\;,]/g, m => "\\" + m).replace(/\n/g, "\\n");
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Plan zajec//PL", "CALSCALE:GREGORIAN"];
+  for (const c of courses) {
+    for (const s of sessions(c)) {
+      if (s.cancelled) continue;
+      const d = s.date.replace(/-/g, "");
+      lines.push("BEGIN:VEVENT",
+        `UID:${s.extraId || c.id + "-" + d}@plan-zajec`,
+        `DTSTAMP:${stamp}`,
+        `DTSTART:${d}T${s.from.replace(":", "")}00`,
+        `DTEND:${d}T${s.to.replace(":", "")}00`,
+        `SUMMARY:${esc(`${c.name} (${c.type})`)}`,
+        ...(s.room ? [`LOCATION:${esc(s.room)}`] : []),
+        "END:VEVENT");
+    }
+  }
+  lines.push("END:VCALENDAR");
+  download("plan-zajec.ics", lines.join("\r\n"), "text/calendar");
+});
+
+function render() { renderCourses(); renderSchedule(); }
+
+// Panele domyślnie zwinięte; zapamiętujemy, który ktoś rozwinął.
+for (const id of ["formBox", "coursesBox"]) {
+  const key = `planZajec.open.${id}`;
+  try { $(id).open = localStorage.getItem(key) === "1"; } catch {}
+  $(id).addEventListener("toggle", () => {
+    try { localStorage.setItem(key, $(id).open ? "1" : "0"); } catch {}
+  });
+}
+
+resetForm();
+render();
+</script>
+</body>
+</html>
